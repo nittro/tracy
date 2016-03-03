@@ -31,6 +31,8 @@ class TracyExtension extends Nette\DI\CompilerExtension
 		'scream' => NULL,
 		'bar' => [], // of class name
 		'blueScreen' => [], // of callback
+		'ajax' => NULL,
+		'ajaxRoute' => NULL,
 	];
 
 	/** @var bool */
@@ -59,6 +61,17 @@ class TracyExtension extends Nette\DI\CompilerExtension
 			->setFactory('Tracy\Debugger::getBar');
 	}
 
+	public function beforeCompile()
+	{
+		$container = $this->getContainerBuilder();
+
+		if ($this->debugMode && $this->config['ajax'] && $this->config['ajaxRoute'] && $router = $container->getByType('Nette\Application\IRouter')) {
+			$container->getDefinition($router)
+				->addSetup('$service[] = new Nette\Application\Routers\Route(?, function($action) { Tracy\Debugger::handleAjaxRequest($action); })', [
+					$this->config['ajaxRoute']
+				]);
+		}
+	}
 
 	public function afterCompile(Nette\PhpGenerator\ClassType $class)
 	{

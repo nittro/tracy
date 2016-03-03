@@ -74,6 +74,14 @@ class Debugger
 	/** @var string|array email(s) to which send error notifications */
 	public static $email;
 
+	/********************* ajax ****************d*k**/
+
+	/** @var bool enable ajax api */
+	public static $ajax = false;
+
+	/** @var string URL that calls the Debugger::handleAjaxRequest() method */
+	public static $ajaxRoute = '_tracy/<action>';
+
 	/** {@link Debugger::log()} and {@link Debugger::fireLog()} */
 	const
 		DEBUG = ILogger::DEBUG,
@@ -209,10 +217,14 @@ class Debugger
 				FALSE
 			);
 
-		} elseif (self::$showBar && !connection_aborted() && !self::$productionMode && self::isHtmlMode()) {
-			self::$reserved = NULL;
-			self::removeOutputBuffers(FALSE);
-			self::getBar()->render();
+		} elseif (self::$showBar && !connection_aborted() && !self::$productionMode) {
+			if (self::isHtmlMode()) {
+				self::$reserved = NULL;
+				self::removeOutputBuffers(FALSE);
+				self::getBar()->render();
+			} elseif (self::isAjax()) {
+				self::getBar()->storePanels();
+			}
 		}
 	}
 
@@ -380,6 +392,10 @@ class Debugger
 			&& !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list()));
 	}
 
+	private static function isAjax()
+	{
+		return isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+	}
 
 	private static function removeOutputBuffers($errorOccurred)
 	{
@@ -465,6 +481,25 @@ class Debugger
 		return self::$fireLogger;
 	}
 
+	/********************* ajax ****************d*k**/
+
+	/**
+	 * @param $action
+	 */
+	public static function handleAjaxRequest($action)
+	{
+		self::$showBar = false;
+
+		if ($action === 'bar') {
+			$payload = self::getBar()->getStoredPanels();
+		} else {
+			$payload = ['error' => true, 'message' => 'Unknown action: ' . $action];
+		}
+
+		Header('Content-Type: application/json');
+		echo json_encode($payload);
+		exit;
+	}
 
 	/********************* useful tools ****************d*g**/
 

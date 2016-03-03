@@ -222,6 +222,7 @@
 		};
 
 		draggable(elem, {
+			handle: elem.querySelector('#tracy-debug-logo'),
 			rightEdge: true,
 			bottomEdge: true,
 			draggedClass: 'tracy-dragged'
@@ -307,12 +308,15 @@
 
 	var Debug = Tracy.Debug = {};
 
-	Debug.init = function() {
+	var ajaxRoute = null;
+
+	Debug.init = function(route) {
 		Debug.initResize();
 		(new Bar).init();
 		[].forEach.call(document.querySelectorAll('.tracy-panel'), function(panel) {
 			Debug.getPanel(panel.id).init();
 		});
+		ajaxRoute = route;
 	};
 
 	Debug.getPanel = function(id) {
@@ -329,6 +333,88 @@
 		});
 	};
 
+	Debug.refreshBar = function () {
+		if (!ajaxRoute) {
+			throw new Error('You must set the AJAX route mask in the Tracy section of your application config');
+		}
+
+		if (!window.XMLHttpRequest) {
+			return;
+		}
+
+		var xhr = new XMLHttpRequest(),
+			url = ajaxRoute.replace(/<action>/, 'bar');
+
+		xhr.open('GET', url, true);
+		xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+		xhr.onreadystatechange = function () {
+			if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+				updatePanel(JSON.parse(xhr.responseText));
+			}
+		};
+		xhr.send();
+	};
+
+	function updatePanel(payload) {
+		[].forEach.call(document.querySelectorAll('.tracy-panel'), function(panel) {
+			panel.parentNode.removeChild(panel);
+		});
+
+		var bar = document.getElementById('tracy-debug-bar'),
+			logo = document.getElementById('tracy-debug-logo');
+
+		logo.parentNode.removeChild(logo);
+
+		while (bar.firstChild) {
+			bar.removeChild(bar.firstChild);
+		}
+
+		var tabs = bar.appendChild(document.createElement('ul'));
+		tabs.innerHTML = logo.outerHTML;
+
+		payload.panels && payload.panels.forEach(function (panel) {
+			if (panel.previous) {
+				tabs = bar.appendChild(document.createElement('ul'));
+				tabs.classList.add('tracy-previous');
+
+			} else {
+				var elem = bar.parentNode.insertBefore(document.createElement('div'), bar);
+				elem.classList.add('tracy-panel');
+				elem.id = 'tracy-debug-panel-' + panel.id;
+
+				if (panel.panel) {
+					elem.innerHTML = panel.panel + '<div class="tracy-icons"><a href="#" title="open in window">&curren;</a><a href="#" rel="close" title="close window">&times;</a></div>';
+				}
+			}
+
+			if (panel.tab) {
+				var tab = tabs.appendChild(document.createElement('li')),
+					btn;
+
+				if (panel.panel) {
+					btn = document.createElement('a');
+					btn.href = '#';
+					btn.rel = panel.id;
+				} else {
+					btn = document.createElement('span');
+
+				}
+
+				btn.innerHTML = panel.tab.replace(/^\s+|\s+$/g, '');
+				tab.appendChild(btn);
+			}
+
+			if (panel.panel) {
+				Debug.getPanel('tracy-debug-panel-' + panel.id).init();
+			}
+		});
+
+		var close = tabs.appendChild(document.createElement('li'));
+		close.innerHTML = '<a href="#" rel="close" title="close debug bar">&times;</a>';
+
+		(new Bar()).init();
+		Tracy.Dumper.init(payload.liveData);
+	}
 
 	// emulate mouseenter & mouseleave
 	function isTargetChanged(target, dest) {

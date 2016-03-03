@@ -53,14 +53,69 @@ class Bar
 	 */
 	public function render()
 	{
-		@session_start(); // @ session may be already started or it is not possible to start session
-		$session = & $_SESSION['__NF']['debuggerbar'];
+		$session = & $this->getSession('previous');
 		$redirect = preg_match('#^Location:#im', implode("\n", headers_list()));
 		if ($redirect) {
 			Dumper::fetchLiveData();
 			Dumper::$livePrefix = count($session) . 'p';
 		}
 
+		$panels = $this->renderPanels();
+
+		if ($redirect) {
+			$session[] = ['panels' => $panels, 'liveData' => Dumper::fetchLiveData()];
+			return;
+		}
+
+		$liveData = Dumper::fetchLiveData();
+		$this->appendSessionPanels($session, $panels, $liveData);
+		$ajaxRoute = Debugger::$ajaxRoute;
+
+		require __DIR__ . '/assets/Bar/bar.phtml';
+	}
+
+	public function getStoredPanels()
+	{
+		$session = & $this->getSession('ajax');
+		$liveData = [];
+		$panels = [];
+		$this->appendSessionPanels($session, $panels, $liveData);
+		array_shift($panels);
+		return ['panels' => $panels, 'liveData' => $liveData];
+	}
+
+	public function storePanels()
+	{
+		$session = & $this->getSession('ajax');
+		$panels = $this->renderPanels();
+		$session[] = ['panels' => $panels, 'liveData' => Dumper::fetchLiveData()];
+	}
+
+	protected function appendSessionPanels(&$session, &$panels, &$liveData)
+	{
+		foreach (array_reverse((array) $session) as $reqId => $info) {
+			$panels[] = [
+				'tab' => '<span title="Previous request before redirect">previous</span>',
+				'panel' => NULL,
+				'previous' => TRUE,
+			];
+			foreach ($info['panels'] as $panel) {
+				$panel['id'] .= '-' . $reqId;
+				$panels[] = $panel;
+			}
+			$liveData += $info['liveData'];
+		}
+		$session = NULL;
+	}
+
+	protected function & getSession($section)
+	{
+		@session_start(); // @ session may be already started or it is not possible to start session
+		return $_SESSION['__NF']['debuggerbar'][$section];
+	}
+
+	protected function renderPanels()
+	{
 		$obLevel = ob_get_level();
 		$panels = [];
 		foreach ($this->panels as $id => $panel) {
@@ -90,28 +145,7 @@ class Bar
 			}
 		}
 
-		if ($redirect) {
-			$session[] = ['panels' => $panels, 'liveData' => Dumper::fetchLiveData()];
-			return;
-		}
-
-		$liveData = Dumper::fetchLiveData();
-
-		foreach (array_reverse((array) $session) as $reqId => $info) {
-			$panels[] = [
-				'tab' => '<span title="Previous request before redirect">previous</span>',
-				'panel' => NULL,
-				'previous' => TRUE,
-			];
-			foreach ($info['panels'] as $panel) {
-				$panel['id'] .= '-' . $reqId;
-				$panels[] = $panel;
-			}
-			$liveData += $info['liveData'];
-		}
-		$session = NULL;
-
-		require __DIR__ . '/assets/Bar/bar.phtml';
+		return $panels;
 	}
 
 }

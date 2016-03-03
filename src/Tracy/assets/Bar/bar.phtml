@@ -8,9 +8,10 @@
  * This file is part of the Tracy (https://tracy.nette.org)
  * Copyright (c) 2004 David Grudl (https://davidgrudl.com)
  *
- * @param  array $panels
- * @param  array $info
- * @param  array $liveData
+ * @param  array  $panels
+ * @param  array  $info
+ * @param  array  $liveData
+ * @param  string $ajaxRoute
  * @return void
  */
 
@@ -84,7 +85,7 @@ use Tracy;
 			})(scripts[i].innerHTML);
 		}
 		Tracy.Dumper.init(<?= json_encode($liveData) ?>);
-		Tracy.Debug.init();
+		Tracy.Debug.init(<?= json_encode($ajaxRoute) ?>);
 		debug.style.display = 'block';
 	});
 })();
