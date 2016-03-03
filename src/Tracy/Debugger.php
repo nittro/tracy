@@ -274,7 +274,10 @@ class Debugger
 			if (self::$showBar) {
 				self::getBar()->render();
 			}
-
+		} elseif (!connection_aborted() && self::isAjax()) {
+			self::storeDump($exception);
+			header('Content-Type: application/json');
+			echo json_encode(['error' => true]);
 		} else {
 			self::fireLog($exception);
 			$s = get_class($exception) . ($exception->getMessage() === '' ? '' : ': ' . $exception->getMessage())
@@ -492,6 +495,8 @@ class Debugger
 
 		if ($action === 'bar') {
 			$payload = self::getBar()->getStoredPanels();
+		} elseif ($action === 'bluescreen') {
+			$payload = self::getStoredDump();
 		} else {
 			$payload = ['error' => true, 'message' => 'Unknown action: ' . $action];
 		}
@@ -499,6 +504,28 @@ class Debugger
 		Header('Content-Type: application/json');
 		echo json_encode($payload);
 		exit;
+	}
+
+	/**
+	 * @return array
+	 */
+	protected static function getStoredDump()
+	{
+		@session_start(); // @ session may be already started or it is not possible to start session
+		$dump = empty($_SESSION['__NF']['bluescreen']) ? null : $_SESSION['__NF']['bluescreen'];
+		$_SESSION['__NF']['bluescreen'] = null;
+		return ['exceptionDump' => $dump];
+	}
+
+	/**
+	 * @param $exception
+	 */
+	protected static function storeDump($exception)
+	{
+		@session_start(); // @ session may be already started or it is not possible to start session
+		ob_start();
+		self::getBlueScreen()->render($exception);
+		$_SESSION['__NF']['bluescreen'] = ob_get_clean();
 	}
 
 	/********************* useful tools ****************d*g**/

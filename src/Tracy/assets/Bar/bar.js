@@ -334,26 +334,39 @@
 	};
 
 	Debug.refreshBar = function () {
+		makeRequest('bar', updatePanel);
+
+	};
+
+	Debug.loadBluescreen = function () {
+		makeRequest('bluescreen', showBluescreen);
+
+	};
+
+	function makeRequest(action, callback) {
 		if (!ajaxRoute) {
 			throw new Error('You must set the AJAX route mask in the Tracy section of your application config');
-		}
-
-		if (!window.XMLHttpRequest) {
+		} else if (!window.XMLHttpRequest) {
 			return;
 		}
 
 		var xhr = new XMLHttpRequest(),
-			url = ajaxRoute.replace(/<action>/, 'bar');
+			url = ajaxRoute.replace(/<action>/, action);
 
 		xhr.open('GET', url, true);
 		xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
 		xhr.onreadystatechange = function () {
 			if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-				updatePanel(JSON.parse(xhr.responseText));
+				try {
+					var payload = JSON.parse(xhr.responseText);
+				} catch (e) {
+					return;
+				}
+				callback(payload);
 			}
 		};
 		xhr.send();
-	};
+	}
 
 	function updatePanel(payload) {
 		[].forEach.call(document.querySelectorAll('.tracy-panel'), function(panel) {
@@ -372,7 +385,7 @@
 		var tabs = bar.appendChild(document.createElement('ul'));
 		tabs.innerHTML = logo.outerHTML;
 
-		payload.panels && payload.panels.forEach(function (panel) {
+		payload.panels.forEach(function (panel) {
 			if (panel.previous) {
 				tabs = bar.appendChild(document.createElement('ul'));
 				tabs.classList.add('tracy-previous');
@@ -414,6 +427,15 @@
 
 		(new Bar()).init();
 		Tracy.Dumper.init(payload.liveData);
+	}
+
+	function showBluescreen(payload) {
+		if (!payload.exceptionDump) {
+			return;
+		}
+		var elem = document.createElement('div');
+		elem.innerHTML = payload.exceptionDump;
+		document.body.appendChild(elem);
 	}
 
 	// emulate mouseenter & mouseleave
