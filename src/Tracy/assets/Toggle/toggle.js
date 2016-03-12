@@ -3,14 +3,14 @@
  */
 
 (function() {
-	Tracy = window.Tracy || {};
+	window.Tracy || (window.Tracy = {});
 
 	Tracy.Toggle = Tracy.Toggle || {};
 
 	// enables <a class="tracy-toggle" href="#"> or <span data-tracy-ref="#"> toggling
 	Tracy.Toggle.init = function() {
 		document.body.addEventListener('click', function(e) {
-			var el = Tracy.closest(e.target, '.tracy-toggle');
+			var el = Tracy.Util.closest(e.target, '.tracy-toggle');
 			if (el && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
 				Tracy.Toggle.toggle(el);
 			}
@@ -37,17 +37,19 @@
 			dest = document;
 		}
 		ref = ref.match(/(\^\s*([^+\s]*)\s*)?(\+\s*(\S*)\s*)?(.*)/);
-		dest = ref[1] ? Tracy.closest(dest.parentNode, ref[2]) : dest;
-		dest = ref[3] ? Tracy.closest(dest.nextElementSibling, ref[4], 'nextElementSibling') : dest;
+		dest = ref[1] ? Tracy.Util.closest(dest.parentNode, ref[2]) : dest;
+		dest = ref[3] ? Tracy.Util.closest(dest.nextElementSibling, ref[4], 'nextElementSibling') : dest;
 		dest = ref[5] ? dest.querySelector(ref[5]) : dest;
 
 		el.classList.toggle('tracy-collapsed', !show);
 		dest.classList.toggle('tracy-collapsed', !show);
 
+		var toggleEvent;
+
 		if (typeof window.Event === 'function') {
-			var toggleEvent = new Event('tracy-toggle', {bubbles: true});
+			toggleEvent = new Event('tracy-toggle', {bubbles: true});
 		} else {
-			var toggleEvent = document.createEvent('Event');
+			toggleEvent = document.createEvent('Event');
 			toggleEvent.initEvent('tracy-toggle', true, false);
 		}
 		el.dispatchEvent(toggleEvent);
@@ -89,16 +91,6 @@
 			});
 			localStorage.setItem('tracy-toggles-' + baseEl.id, JSON.stringify(toggles));
 		});
-	}
-
-
-	// finds closing maching element
-	Tracy.closest = function(el, selector, func) {
-		var matches = el.matches || el.matchesSelector || el.msMatchesSelector || el.mozMatchesSelector || el.webkitMatchesSelector || el.oMatchesSelector;
-		while (el && selector && !(el.nodeType === 1 && matches.call(el, selector))) {
-			el = el[func || 'parentNode'];
-		}
-		return el;
 	};
 
 })();

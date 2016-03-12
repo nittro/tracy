@@ -53,7 +53,22 @@ class Bar
 	 */
 	public function render()
 	{
-		$session = & $this->getSession('previous');
+		$info = $this->buildInfo();
+
+		if (!$info) {
+			return;
+		}
+
+		extract($info);
+		$ajaxRoute = Debugger::$ajaxEnabled ? Debugger::$ajaxRoute : null;
+
+		require __DIR__ . '/assets/Bar/bar.phtml';
+	}
+
+	public function buildInfo()
+	{
+		@session_start(); // @ session may be already started or it is not possible to start session
+		$session = & $_SESSION['__NF']['debuggerbar'];
 		$redirect = preg_match('#^Location:#im', implode("\n", headers_list()));
 		if ($redirect) {
 			Dumper::fetchLiveData();
@@ -61,57 +76,28 @@ class Bar
 		}
 
 		$panels = $this->renderPanels();
+		$liveData = Dumper::fetchLiveData();
 
 		if ($redirect) {
-			$session[] = ['panels' => $panels, 'liveData' => Dumper::fetchLiveData()];
-			return;
+			$session[] = ['panels' => $panels, 'liveData' => $liveData];
+			return null;
 		}
 
-		$liveData = Dumper::fetchLiveData();
-		$this->appendSessionPanels($session, $panels, $liveData);
-		$ajaxRoute = Debugger::$ajaxRoute;
+		$sections = [];
+		$sections[] = $panels;
 
-		require __DIR__ . '/assets/Bar/bar.phtml';
-	}
-
-	public function getStoredPanels()
-	{
-		$session = & $this->getSession('ajax');
-		$liveData = [];
-		$panels = [];
-		$this->appendSessionPanels($session, $panels, $liveData);
-		array_shift($panels);
-		return ['panels' => $panels, 'liveData' => $liveData];
-	}
-
-	public function storePanels()
-	{
-		$session = & $this->getSession('ajax');
-		$panels = $this->renderPanels();
-		$session[] = ['panels' => $panels, 'liveData' => Dumper::fetchLiveData()];
-	}
-
-	protected function appendSessionPanels(&$session, &$panels, &$liveData)
-	{
 		foreach (array_reverse((array) $session) as $reqId => $info) {
-			$panels[] = [
-				'tab' => '<span title="Previous request before redirect">previous</span>',
-				'panel' => NULL,
-				'previous' => TRUE,
-			];
-			foreach ($info['panels'] as $panel) {
+			foreach ($info['panels'] as &$panel) {
 				$panel['id'] .= '-' . $reqId;
-				$panels[] = $panel;
 			}
+
+			$sections[] = $info['panels'];
 			$liveData += $info['liveData'];
+
 		}
 		$session = NULL;
-	}
 
-	protected function & getSession($section)
-	{
-		@session_start(); // @ session may be already started or it is not possible to start session
-		return $_SESSION['__NF']['debuggerbar'][$section];
+		return ['sections' => $sections, 'liveData' => $liveData];
 	}
 
 	protected function renderPanels()

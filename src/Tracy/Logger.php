@@ -123,7 +123,7 @@ class Logger implements ILogger
 	public function getExceptionFile($exception)
 	{
 		$dir = strtr($this->directory . '/', '\\/', DIRECTORY_SEPARATOR . DIRECTORY_SEPARATOR);
-		$hash = substr(md5(preg_replace('~(Resource id #)\d+~', '$1', $exception)), 0, 10);
+		$hash = Helpers::getExceptionHash($exception);
 		foreach (new \DirectoryIterator($this->directory) as $file) {
 			if (strpos($file, $hash)) {
 				return $dir . $file;

@@ -77,7 +77,7 @@ class Debugger
 	/********************* ajax ****************d*k**/
 
 	/** @var bool enable ajax api */
-	public static $ajax = false;
+	public static $ajaxEnabled = false;
 
 	/** @var string URL that calls the Debugger::handleAjaxRequest() method */
 	public static $ajaxRoute = '_tracy/<action>';
@@ -115,6 +115,9 @@ class Debugger
 
 	/** @var Bar */
 	private static $bar;
+
+	/** @var AjaxHelper */
+	private static $ajaxHelper;
 
 	/** @var ILogger */
 	private static $logger;
@@ -182,7 +185,7 @@ class Debugger
 			set_exception_handler([__CLASS__, 'exceptionHandler']);
 			set_error_handler([__CLASS__, 'errorHandler']);
 
-			array_map('class_exists', [Bar::class, BlueScreen::class, DefaultBarPanel::class, Dumper::class,
+			array_map('class_exists', [Bar::class, BlueScreen::class, AjaxHelper::class, DefaultBarPanel::class, Dumper::class,
 				FireLogger::class, Helpers::class, Logger::class]);
 
 			self::$enabled = TRUE;
@@ -223,7 +226,8 @@ class Debugger
 				self::removeOutputBuffers(FALSE);
 				self::getBar()->render();
 			} elseif (self::isAjax()) {
-				self::getBar()->storePanels();
+				self::$reserved = NULL;
+				self::getAjaxHelper()->storeBar(self::getBar()->buildInfo());
 			}
 		}
 	}
@@ -275,7 +279,11 @@ class Debugger
 				self::getBar()->render();
 			}
 		} elseif (!connection_aborted() && self::isAjax()) {
-			self::storeDump($exception);
+			ob_start();
+			self::getBlueScreen()->render($exception);
+			$bluescreen = ob_get_clean();
+			self::getAjaxHelper()->storeBluescreen($bluescreen);
+
 			header('Content-Type: application/json');
 			echo json_encode(['error' => true]);
 		} else {
@@ -451,6 +459,18 @@ class Debugger
 
 
 	/**
+	 * @return AjaxHelper
+	 */
+	public static function getAjaxHelper()
+	{
+		if (!self::$ajaxHelper) {
+			self::$ajaxHelper = new AjaxHelper;
+		}
+		return self::$ajaxHelper;
+	}
+
+
+	/**
 	 * @return void
 	 */
 	public static function setLogger(ILogger $logger)
@@ -484,49 +504,6 @@ class Debugger
 		return self::$fireLogger;
 	}
 
-	/********************* ajax ****************d*k**/
-
-	/**
-	 * @param $action
-	 */
-	public static function handleAjaxRequest($action)
-	{
-		self::$showBar = false;
-
-		if ($action === 'bar') {
-			$payload = self::getBar()->getStoredPanels();
-		} elseif ($action === 'bluescreen') {
-			$payload = self::getStoredDump();
-		} else {
-			$payload = ['error' => true, 'message' => 'Unknown action: ' . $action];
-		}
-
-		Header('Content-Type: application/json');
-		echo json_encode($payload);
-		exit;
-	}
-
-	/**
-	 * @return array
-	 */
-	protected static function getStoredDump()
-	{
-		@session_start(); // @ session may be already started or it is not possible to start session
-		$dump = empty($_SESSION['__NF']['bluescreen']) ? null : $_SESSION['__NF']['bluescreen'];
-		$_SESSION['__NF']['bluescreen'] = null;
-		return ['exceptionDump' => $dump];
-	}
-
-	/**
-	 * @param $exception
-	 */
-	protected static function storeDump($exception)
-	{
-		@session_start(); // @ session may be already started or it is not possible to start session
-		ob_start();
-		self::getBlueScreen()->render($exception);
-		$_SESSION['__NF']['bluescreen'] = ob_get_clean();
-	}
 
 	/********************* useful tools ****************d*g**/
 

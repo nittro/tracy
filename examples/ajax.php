@@ -7,19 +7,19 @@ use Tracy\Debugger;
 
 Debugger::enable(Debugger::DEVELOPMENT, __DIR__ . '/log');
 
-Debugger::$ajax = true;
+Debugger::$ajaxEnabled = TRUE;
 Debugger::$ajaxRoute = basename(__FILE__) . '?action=<action>';
 
 if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
 	if (isSet($_GET['action'])) {
-		Debugger::handleAjaxRequest($_GET['action']);
+		Debugger::getAjaxHelper()->handleRequest($_GET['action']);
 	}
 
 	Debugger::barDump('bar', 'foo');
 
 	Header('Content-Type: application/json');
 	echo json_encode([
-		'success' => true,
+		'success' => TRUE,
 		'message' => 'Thank you for your purchase',
 	]);
 	exit;
@@ -46,9 +46,10 @@ if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
 				if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
 					var payload = JSON.parse(xhr.responseText);
 					btn.parentNode.textContent = payload.message;
+					document.documentElement.classList.add('arrow');
 
 					// call this after every AJAX update
-					window.Tracy && Tracy.Debug && typeof Tracy.Debug.refreshBar === 'function' && Tracy.Debug.refreshBar();
+					window.Tracy && Tracy.refreshBar();
 				}
 			};
 			xhr.send();

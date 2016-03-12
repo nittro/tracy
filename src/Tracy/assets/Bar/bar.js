@@ -3,12 +3,19 @@
  */
 
 (function(){
-	Tracy = window.Tracy || {};
+	window.Tracy || (window.Tracy = {});
 
-	var Panel = Tracy.DebugPanel = function(id) {
-		this.id = 'tracy-debug-panel-' + id;
-		this.elem = document.getElementById(this.id);
+	var Panel = Tracy.DebugPanel = function(debug, id, html) {
+		this.id = id;
+		this.elem = document.createElement('div');
+		this.elem.id = this.id;
+		this.elem.classList.add('tracy-panel');
 		this.elem.Tracy = this.elem.Tracy || {};
+
+		debug.getElement().appendChild(this.elem);
+		Tracy.Util.setHtml(this.elem, html + '<div class="tracy-icons"><a href="#" title="open in window">&curren;</a><a href="#" rel="close" title="close window">&times;</a></div>');
+		this.init();
+
 	};
 
 	Panel.PEEK = 'tracy-mode-peek';
@@ -33,23 +40,23 @@
 			}
 		});
 
-		elem.addEventListener('mouseover', function(e) {
-			if (isTargetChanged(e.relatedTarget, this)) {
+		elem.addEventListener('mouseover', function(evt) {
+			if (isTargetChanged(evt.relatedTarget, this)) {
 				_this.focus();
 			}
-		});
+		}, false);
 
-		elem.addEventListener('mouseout', function(e) {
-			if (isTargetChanged(e.relatedTarget, this)) {
+		elem.addEventListener('mouseout', function(evt) {
+			if (isTargetChanged(evt.relatedTarget, this)) {
 				_this.blur();
 			}
-		});
+		}, false);
 
 		elem.addEventListener('click', function() {
 			_this.oldPosition = getPosition(elem);
-		});
+		}, false);
 
-		document.documentElement.addEventListener('click', function() {
+		this.applyOldPosition = function() {
 			if (_this.oldPosition) {
 				var pos = getPosition(elem);
 				setPosition(elem, {
@@ -58,21 +65,19 @@
 				});
 			}
 			_this.oldPosition = null;
-		});
+		};
+
+		document.documentElement.addEventListener('click', this.applyOldPosition, false);
 
 		[].forEach.call(elem.querySelectorAll('.tracy-icons a'), function(a) {
-			a.addEventListener('click', function(e) {
+			a.addEventListener('click', function(evt) {
 				if (this.rel === 'close') {
 					_this.toPeek();
 				} else {
 					_this.toWindow();
 				}
-				e.preventDefault();
-			});
-		});
-
-		window.addEventListener('unload', function() {
-			_this.savePosition();
+				evt.preventDefault();
+			}, false);
 		});
 
 		Tracy.Toggle.persist(elem);
@@ -138,15 +143,18 @@
 		}
 
 		var doc = win.document;
-		doc.write('<!DOCTYPE html><meta charset="utf-8"><style>'
+		doc.write('<!DOCTYPE html><meta charset="utf-8"><style type="text/css">'
 			+ document.getElementById('tracy-debug-style').innerHTML
-			+ '<\/style><script>'
+			+ '<\/style><script type="text/javascript">'
 			+ document.getElementById('tracy-debug-script').innerHTML
 			+ '<\/script><body id="tracy-debug">'
 		);
-		doc.body.innerHTML = '<div class="tracy-panel tracy-mode-window" id="' + this.id + '">' + this.elem.innerHTML + '<\/div>';
-		var winPanel = win.Tracy.Debug.getPanel(this.id);
+		win.Tracy.Debug.getInstance().addPanel(this.id, this.elem.innerHTML);
+		doc.getElementById(this.id).classList.remove(Panel.PEEK);
+		doc.getElementById(this.id).classList.add(Panel.WINDOW);
+
 		win.Tracy.Dumper.init();
+
 		if (this.elem.querySelector('h1')) {
 			doc.title = this.elem.querySelector('h1').innerHTML;
 		}
@@ -155,13 +163,13 @@
 		win.addEventListener('beforeunload', function() {
 			_this.toPeek();
 			win.close(); // forces closing, can be invoked by F5
-		});
+		}, false);
 
 		doc.addEventListener('keyup', function(e) {
 			if (e.keyCode === 27 && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
 				win.close();
 			}
-		});
+		}, false);
 
 		this.elem.style.display = 'none';
 		this.elem.classList.remove(Panel.FLOAT);
@@ -207,14 +215,137 @@
 		}
 	};
 
+	Panel.prototype.destroy = function () {
+		this.savePosition();
+		document.documentElement.removeEventListener('click', this.applyOldPosition, false);
 
-	var Bar = Tracy.DebugBar = function() {
+		if (this.is(Panel.WINDOW)) {
+			this.elem.Tracy.window.close();
+		}
+
+		if (this.elem.parentNode) {
+			this.elem.parentNode.removeChild(this.elem);
+		}
+	};
+
+
+	var Tab = Tracy.DebugBarTab = function (section, html, options) {
+		this.elem = document.createElement('li');
+
+		if (typeof options === 'string') {
+			options = {rel: options};
+		} else if (!options) {
+			options = {};
+		}
+
+		this.persistent = !!options.persistent;
+
+		var elem;
+
+		if (options.rel) {
+			elem = document.createElement('a');
+			elem.href = '#';
+			elem.rel = options.rel;
+			this.elem.appendChild(elem);
+
+		} else if (!options.raw) {
+			elem = document.createElement('span');
+			this.elem.appendChild(elem);
+
+		} else {
+			elem = this.elem;
+
+		}
+
+		if (options.id) {
+			this.elem.id = options.id;
+		}
+
+		if (options.title) {
+			elem.title = options.title;
+		}
+
+		section.getElement().appendChild(this.elem);
+		Tracy.Util.setHtml(elem, html);
+
+	};
+
+	Tab.prototype.isPersistent = function () {
+		return this.persistent;
+	};
+
+	Tab.prototype.destroy = function () {
+		if (this.elem.parentNode) {
+			this.elem.parentNode.removeChild(this.elem);
+		}
+	};
+
+
+	var Section = Tracy.DebugBarSection = function (bar) {
+		this.elem = document.createElement('ul');
+		bar.getElement().appendChild(this.elem);
+		this.tabs = [];
+
+	};
+
+	Section.prototype.getElement = function () {
+		return this.elem;
+	};
+
+	Section.prototype.addTab = function (html, options) {
+		this.tabs.push(new Tab(this, html, options));
+
+	};
+
+	Section.prototype.destroy = function (force) {
+		this.tabs = this.tabs.filter(function (tab) {
+			if (force || !tab.isPersistent()) {
+				tab.destroy();
+				return false;
+			} else {
+				return true;
+			}
+		});
+
+		if (force && this.elem.parentNode) {
+			this.elem.parentNode.removeChild(this.elem);
+
+		}
+	};
+
+	var Bar = Tracy.DebugBar = function(debug) {
+		this.debug = debug;
+		this.elem = document.createElement('div');
+		this.elem.id = this.id;
+		this.debug.getElement().appendChild(this.elem);
+		this.sections = [new Section(this)];
+		this.getSection(0).addTab(Bar.LOGO, {persistent: true, id: 'tracy-debug-logo', title: 'Tracy Debug'});
+		this.init();
+
 	};
 
 	Bar.prototype.id = 'tracy-debug-bar';
 
+	Bar.LOGO = '<svg viewBox="0 -10 1561 333"><path fill="#585755" d="m176 327h-57v-269h-119v-57h291v57h-115v269zm208-191h114c50 0 47-78 0-78h-114v78zm106-135c17 0 33 2 46 7 75 30 75 144 1 175-13 6-29 8-47 8h-27l132 74v68l-211-128v122h-57v-326h163zm300 57c-5 0-9 3-11 9l-56 156h135l-55-155c-2-7-6-10-13-10zm-86 222l-17 47h-61l102-285c20-56 107-56 126 0l102 285h-61l-17-47h-174zm410 47c-98 0-148-55-148-163v-2c0-107 50-161 149-161h118v57h-133c-26 0-45 8-58 25-12 17-19 44-19 81 0 71 26 106 77 106h133v57h-119zm270-145l-121-181h68l81 130 81-130h68l-121 178v148h-56v-145z"/></svg>';
+
+	Bar.prototype.getElement = function () {
+		return this.elem;
+	};
+
+	Bar.prototype.getSection = function (i) {
+		if (!this.sections[i]) {
+			this.sections[i] = new Section(this);
+			this.sections[i].getElement().classList.add('tracy-previous');
+			this.sections[i].addTab('previous', {title: 'Previous request before redirect'});
+
+		}
+
+		return this.sections[i];
+
+	};
+
 	Bar.prototype.init = function() {
-		var elem = document.getElementById(this.id), _this = this;
+		var elem = this.elem, _this = this;
 
 		elem.Tracy = {};
 		elem.Tracy.onMove = function(coords) {
@@ -228,58 +359,88 @@
 			draggedClass: 'tracy-dragged'
 		});
 
-		[].forEach.call(elem.querySelectorAll('a'), function(a) {
-			a.addEventListener('click', function(e) {
-				if (this.rel === 'close') {
+		elem.addEventListener('click', function (evt) {
+			evt.preventDefault();
+
+			var a = Tracy.Util.closest(evt.target, 'a', Tracy.Util.until(elem)),
+				panel = a && a.rel ? _this.debug.getPanel(a.rel) : null;
+
+			if (!a) {
+				return;
+
+			} else if (!panel) {
+				if (a.rel === 'close') {
 					_this.close();
 
-				} else if (this.rel) {
-					var panel = Debug.getPanel(this.rel);
-					if (e.shiftKey) {
-						panel.toFloat();
-						panel.toWindow();
-
-					} else if (panel.is(Panel.FLOAT)) {
-						panel.toPeek();
-
-					} else {
-						panel.toFloat();
-						setPosition(panel.elem, {
-							right: getPosition(panel.elem).right + Math.round(Math.random() * 100) + 20,
-							bottom: getPosition(panel.elem).bottom + Math.round(Math.random() * 100) + 20
-						});
-					}
 				}
-				e.preventDefault();
-			});
 
-			a.addEventListener('mouseover', function(e) {
-				if (isTargetChanged(e.relatedTarget, this) && this.rel && this.rel !== 'close' && !elem.classList.contains('tracy-dragged')) {
-					var panel = Debug.getPanel(this.rel), link = this;
-					panel.focus(function() {
-						if (panel.is(Panel.PEEK)) {
-							var pos = getPosition(panel.elem);
-							setPosition(panel.elem, {
-								right: pos.right - getOffset(link).left + pos.width - getPosition(link).width - 4 + getOffset(panel.elem).left,
-								bottom: pos.bottom - getOffset(elem).top + pos.height + 4 + getOffset(panel.elem).top
-							});
-						}
+				return;
+			}
+
+			if (evt.shiftKey) {
+				panel.toFloat();
+				panel.toWindow();
+
+			} else if (panel.is(Panel.FLOAT)) {
+				panel.toPeek();
+
+			} else {
+				panel.toFloat();
+				setPosition(panel.elem, {
+					right: getPosition(panel.elem).right + Math.round(Math.random() * 100) + 20,
+					bottom: getPosition(panel.elem).bottom + Math.round(Math.random() * 100) + 20
+				});
+			}
+		}, false);
+
+		elem.addEventListener('mouseover', function (evt) {
+			var a = Tracy.Util.closest(evt.target, 'a', Tracy.Util.until(elem)),
+				panel = a && a.rel ? _this.debug.getPanel(a.rel) : null;
+
+			if (!a || !panel || !isTargetChanged(evt.relatedTarget, a) || elem.classList.contains('tracy-dragged')) {
+				return;
+			}
+
+			panel.focus(function() {
+				if (panel.is(Panel.PEEK)) {
+					var pos = getPosition(panel.elem);
+					setPosition(panel.elem, {
+						right: pos.right - getOffset(a).left + pos.width - getPosition(a).width - 4 + getOffset(panel.elem).left,
+						bottom: pos.bottom - getOffset(elem).top + pos.height + 4 + getOffset(panel.elem).top
 					});
 				}
 			});
+		}, false);
 
-			a.addEventListener('mouseout', function(e) {
-				if (isTargetChanged(e.relatedTarget, this) && this.rel && this.rel !== 'close' && !elem.classList.contains('tracy-dragged')) {
-					Debug.getPanel(this.rel).blur();
-				}
+		elem.addEventListener('mouseout', function (evt) {
+			var a = Tracy.Util.closest(evt.target, 'a', Tracy.Util.until(elem)),
+				panel = a && a.rel ? _this.debug.getPanel(a.rel) : null;
+
+			if (a && panel && isTargetChanged(evt.relatedTarget, a) && !elem.classList.contains('tracy-dragged')) {
+				_this.debug.getPanel(a.rel).blur();
+			}
+		}, false);
+
+		window.addEventListener('unload', function() {
+			_this.destroy();
+		}, false);
+
+		this.restorePosition();
+	};
+
+	Bar.prototype.build = function (sections) {
+		var _this = this;
+
+		sections.forEach(function (panels, i) {
+			var section = _this.getSection(i);
+
+			panels.forEach(function (panel) {
+				section.addTab(panel.tab, panel.panel ? 'tracy-debug-panel-' + panel.id : null, false);
 			});
 		});
 
-		window.addEventListener('unload', function() {
-			_this.savePosition();
-		});
+		this.getSection(this.sections.length - 1).addTab('&times;', 'close', false);
 
-		this.restorePosition();
 	};
 
 	Bar.prototype.close = function() {
@@ -305,138 +466,128 @@
 		}
 	};
 
+	Bar.prototype.cleanup = function () {
+		if (!this.sections.length) {
+			return;
+		}
 
-	var Debug = Tracy.Debug = {};
+		this.sections[0].destroy(false);
 
-	var ajaxRoute = null;
-
-	Debug.init = function(route) {
-		Debug.initResize();
-		(new Bar).init();
-		[].forEach.call(document.querySelectorAll('.tracy-panel'), function(panel) {
-			Debug.getPanel(panel.id).init();
+		this.sections.splice(1, this.sections.length).forEach(function (section) {
+			section.destroy(true);
 		});
-		ajaxRoute = route;
 	};
 
-	Debug.getPanel = function(id) {
-		return new Panel(id.replace('tracy-debug-panel-', ''));
+	Bar.prototype.destroy = function () {
+		this.savePosition();
+
+		this.sections.forEach(function (section) {
+			section.destroy(true);
+		});
 	};
 
-	Debug.initResize = function() {
+
+
+	var Debug = Tracy.Debug = function () {
+		this.elem = document.getElementById('tracy-debug');
+		this.bar = new Bar(this);
+		this.panels = {};
+		this.ajaxRoute = null;
+		this.initResize();
+
+	};
+
+	Debug.instance = null;
+
+	Debug.getInstance = function () {
+		if (!Debug.instance) {
+			Debug.instance = new Debug();
+		}
+
+		return Debug.instance;
+
+	};
+
+	Debug.prototype.getElement = function () {
+		return this.elem;
+	};
+
+	Debug.prototype.getPanel = function(id) {
+		return this.panels[id];
+	};
+
+	Debug.prototype.addPanel = function (id, html) {
+		this.panels[id] = new Panel(this, id, html);
+	};
+
+	Debug.prototype.setAjaxRoute = function (route) {
+		this.ajaxRoute = route;
+	};
+
+	Debug.prototype.initResize = function() {
+		var panels = this.panels,
+			bar = this.bar.getElement();
+
 		window.addEventListener('resize', function() {
-			var bar = document.getElementById(Bar.prototype.id);
 			setPosition(bar, {right: getPosition(bar).right, bottom: getPosition(bar).bottom});
-			[].forEach.call(document.querySelectorAll('.tracy-panel'), function(panel) {
-				Debug.getPanel(panel.id).reposition();
+
+			for (var id in panels) {
+				panels[id].reposition();
+			}
+		});
+	};
+
+	Debug.prototype.build = function (sections) {
+		var _this = this;
+		this.bar.build(sections);
+
+		sections.forEach(function (panels) {
+			panels.forEach(function (panel) {
+				if (panel.panel) {
+					_this.addPanel('tracy-debug-panel-' + panel.id, panel.panel);
+				}
 			});
 		});
 	};
 
-	Debug.refreshBar = function () {
-		makeRequest('bar', updatePanel);
+	Debug.prototype.cleanup = function () {
+		this.bar.cleanup();
 
+		for (var id in this.panels) {
+			this.panels[id].destroy();
+		}
 	};
 
-	Debug.loadBluescreen = function () {
-		makeRequest('bluescreen', showBluescreen);
+	Tracy.refreshBar = function () {
+		var debug = Debug.getInstance();
 
-	};
-
-	function makeRequest(action, callback) {
-		if (!ajaxRoute) {
-			throw new Error('You must set the AJAX route mask in the Tracy section of your application config');
-		} else if (!window.XMLHttpRequest) {
+		if (!debug.ajaxRoute) {
 			return;
 		}
 
-		var xhr = new XMLHttpRequest(),
-			url = ajaxRoute.replace(/<action>/, action);
+		debug.cleanup();
 
-		xhr.open('GET', url, true);
-		xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-		xhr.onreadystatechange = function () {
-			if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-				try {
-					var payload = JSON.parse(xhr.responseText);
-				} catch (e) {
-					return;
-				}
-				callback(payload);
-			}
-		};
-		xhr.send();
-	}
-
-	function updatePanel(payload) {
-		[].forEach.call(document.querySelectorAll('.tracy-panel'), function(panel) {
-			panel.parentNode.removeChild(panel);
+		Tracy.Util.xhr(debug.ajaxRoute.replace(/<action>/, 'bar'), function (payload) {
+			debug.build(payload.sections);
+			Tracy.Dumper.init(payload.liveData);
 		});
+	};
 
-		var bar = document.getElementById('tracy-debug-bar'),
-			logo = document.getElementById('tracy-debug-logo');
+	Tracy.loadBluescreen = function () {
+		var debug = Debug.getInstance();
 
-		logo.parentNode.removeChild(logo);
-
-		while (bar.firstChild) {
-			bar.removeChild(bar.firstChild);
-		}
-
-		var tabs = bar.appendChild(document.createElement('ul'));
-		tabs.innerHTML = logo.outerHTML;
-
-		payload.panels.forEach(function (panel) {
-			if (panel.previous) {
-				tabs = bar.appendChild(document.createElement('ul'));
-				tabs.classList.add('tracy-previous');
-
-			} else {
-				var elem = bar.parentNode.insertBefore(document.createElement('div'), bar);
-				elem.classList.add('tracy-panel');
-				elem.id = 'tracy-debug-panel-' + panel.id;
-
-				if (panel.panel) {
-					elem.innerHTML = panel.panel + '<div class="tracy-icons"><a href="#" title="open in window">&curren;</a><a href="#" rel="close" title="close window">&times;</a></div>';
-				}
-			}
-
-			if (panel.tab) {
-				var tab = tabs.appendChild(document.createElement('li')),
-					btn;
-
-				if (panel.panel) {
-					btn = document.createElement('a');
-					btn.href = '#';
-					btn.rel = panel.id;
-				} else {
-					btn = document.createElement('span');
-
-				}
-
-				btn.innerHTML = panel.tab.replace(/^\s+|\s+$/g, '');
-				tab.appendChild(btn);
-			}
-
-			if (panel.panel) {
-				Debug.getPanel('tracy-debug-panel-' + panel.id).init();
-			}
-		});
-
-		var close = tabs.appendChild(document.createElement('li'));
-		close.innerHTML = '<a href="#" rel="close" title="close debug bar">&times;</a>';
-
-		(new Bar()).init();
-		Tracy.Dumper.init(payload.liveData);
-	}
-
-	function showBluescreen(payload) {
-		if (!payload.exceptionDump) {
+		if (!debug.ajaxRoute) {
 			return;
 		}
-		var elem = document.createElement('div');
-		elem.innerHTML = payload.exceptionDump;
-		document.body.appendChild(elem);
-	}
+
+		debug.cleanup();
+
+		Tracy.Util.xhr(debug.ajaxRoute.replace(/<action>/, 'bluescreen'), function (payload) {
+			var elem = document.createElement('div');
+			document.body.appendChild(elem);
+			Tracy.Util.setHtml(elem, payload.bluescreen);
+		});
+	};
 
 	// emulate mouseenter & mouseleave
 	function isTargetChanged(target, dest) {

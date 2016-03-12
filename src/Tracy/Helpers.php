@@ -141,6 +141,15 @@ class Helpers
 
 
 	/** @internal */
+	public static function getExceptionHash($exception)
+	{
+		if ($exception instanceof \Exception || $exception instanceof \Throwable) {
+			return substr(md5(preg_replace('~(Resource id #)\d+~', '$1', $exception)), 0, 10);
+		}
+	}
+
+
+	/** @internal */
 	public static function getSource()
 	{
 		if (isset($_SERVER['REQUEST_URI'])) {

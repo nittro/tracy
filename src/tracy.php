@@ -9,6 +9,7 @@
 require __DIR__ . '/Tracy/IBarPanel.php';
 require __DIR__ . '/Tracy/Bar.php';
 require __DIR__ . '/Tracy/BlueScreen.php';
+require __DIR__ . '/Tracy/AjaxHelper.php';
 require __DIR__ . '/Tracy/DefaultBarPanel.php';
 require __DIR__ . '/Tracy/Dumper.php';
 require __DIR__ . '/Tracy/ILogger.php';

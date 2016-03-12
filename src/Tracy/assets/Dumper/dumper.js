@@ -6,7 +6,7 @@
 	var COLLAPSE_COUNT = 7,
 		COLLAPSE_COUNT_TOP = 14;
 
-	Tracy = window.Tracy || {};
+	window.Tracy || (window.Tracy = {});
 
 	Tracy.Dumper = Tracy.Dumper || {};
 
@@ -33,7 +33,7 @@
 		// enables <span data-tracy-href=""> & ctrl key
 		document.body.addEventListener('click', function(e) {
 			var el;
-			if (e.ctrlKey && (el = Tracy.closest(e.target, '[data-tracy-href]'))) {
+			if (e.ctrlKey && (el = Tracy.Util.closest(e.target, '[data-tracy-href]'))) {
 				location.href = el.getAttribute('data-tracy-href');
 				return false;
 			}
@@ -87,7 +87,7 @@
 				throw new UnknownEntityException;
 			}
 			parentIds = parentIds || [];
-			recursive = parentIds.indexOf(id) > -1;
+			var recursive = parentIds.indexOf(id) > -1;
 			parentIds.push(id);
 
 			return buildStruct([

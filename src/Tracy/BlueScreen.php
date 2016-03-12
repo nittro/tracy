@@ -56,6 +56,7 @@ class BlueScreen
 		$info = array_filter($this->info);
 		$source = Helpers::getSource();
 		$sourceIsUrl = preg_match('#^https?://#', $source);
+		$hash = Helpers::getExceptionHash($exception);
 		$title = $exception instanceof \ErrorException
 			? Helpers::errorTypeToString($exception->getSeverity())
 			: Helpers::getClass($exception);

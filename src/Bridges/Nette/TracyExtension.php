@@ -67,7 +67,7 @@ class TracyExtension extends Nette\DI\CompilerExtension
 
 		if ($this->debugMode && $this->config['ajax'] && $this->config['ajaxRoute'] && $router = $container->getByType('Nette\Application\IRouter')) {
 			$container->getDefinition($router)
-				->addSetup('$service[] = new Nette\Application\Routers\Route(?, function($action) { Tracy\Debugger::handleAjaxRequest($action); })', [
+				->addSetup('$service[] = new Nette\Application\Routers\Route(?, function($action) { Tracy\Debugger::getAjaxHelper()->handleRequest($action); })', [
 					$this->config['ajaxRoute']
 				]);
 		}
