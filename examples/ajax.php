@@ -12,7 +12,7 @@ Debugger::$ajaxRoute = basename(__FILE__) . '?action=<action>';
 
 if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
 	if (isSet($_GET['action'])) {
-		Debugger::getAjaxHelper()->handleRequest($_GET['action']);
+		Debugger::getAjaxController()->run($_GET['action']);
 	}
 
 	Debugger::barDump('bar', 'foo');
@@ -49,7 +49,7 @@ if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
 					document.documentElement.classList.add('arrow');
 
 					// call this after every AJAX update
-					window.Tracy && Tracy.refreshBar();
+					window.Tracy && Tracy.update();
 				}
 			};
 			xhr.send();

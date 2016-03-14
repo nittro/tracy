@@ -558,7 +558,7 @@
 		}
 	};
 
-	Tracy.refreshBar = function () {
+	Tracy.update = function () {
 		var debug = Debug.getInstance();
 
 		if (!debug.ajaxRoute) {
@@ -567,27 +567,21 @@
 
 		debug.cleanup();
 
-		Tracy.Util.xhr(debug.ajaxRoute.replace(/<action>/, 'bar'), function (payload) {
-			debug.build(payload.sections);
-			Tracy.Dumper.init(payload.liveData);
+		Tracy.Util.xhr(debug.ajaxRoute.replace(/<action>/, 'update'), function (payload) {
+			if (payload.bar) {
+				debug.build(payload.bar.sections);
+				Tracy.Dumper.init(payload.bar.liveData);
+			}
+
+			if (payload.bluescreen) {
+				var elem = document.createElement('div');
+				document.body.appendChild(elem);
+				Tracy.Util.setHtml(elem, payload.bluescreen);
+			}
 		});
 	};
 
-	Tracy.loadBluescreen = function () {
-		var debug = Debug.getInstance();
 
-		if (!debug.ajaxRoute) {
-			return;
-		}
-
-		debug.cleanup();
-
-		Tracy.Util.xhr(debug.ajaxRoute.replace(/<action>/, 'bluescreen'), function (payload) {
-			var elem = document.createElement('div');
-			document.body.appendChild(elem);
-			Tracy.Util.setHtml(elem, payload.bluescreen);
-		});
-	};
 
 	// emulate mouseenter & mouseleave
 	function isTargetChanged(target, dest) {

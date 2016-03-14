@@ -14,7 +14,7 @@ Debugger::$scream = TRUE;
 
 if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
 	if (isSet($_GET['action'])) {
-		Debugger::getAjaxHelper()->handleRequest($_GET['action']);
+		Debugger::getAjaxController()->run($_GET['action']);
 	}
 
 	Debugger::barDump('bar', 'foo');
@@ -52,10 +52,10 @@ if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
 						btn.parentNode.textContent = payload.message;
 
 						// call this after every AJAX update
-						window.Tracy && Tracy.refreshBar();
+						window.Tracy && Tracy.update();
 					} else {
 						// call this after every AJAX update
-						window.Tracy && Tracy.loadBluescreen();
+						window.Tracy && Tracy.update();
 					}
 				}
 			};

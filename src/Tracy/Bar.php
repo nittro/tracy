@@ -60,7 +60,7 @@ class Bar
 		}
 
 		extract($info);
-		$ajaxRoute = Debugger::$ajaxEnabled ? Debugger::$ajaxRoute : null;
+		$ajaxRoute = Debugger::$ajaxEnabled ? Debugger::$ajaxRoute : NULL;
 
 		require __DIR__ . '/assets/Bar/bar.phtml';
 	}
@@ -80,7 +80,7 @@ class Bar
 
 		if ($redirect) {
 			$session[] = ['panels' => $panels, 'liveData' => $liveData];
-			return null;
+			return NULL;
 		}
 
 		$sections = [];

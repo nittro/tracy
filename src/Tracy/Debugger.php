@@ -77,7 +77,7 @@ class Debugger
 	/********************* ajax ****************d*k**/
 
 	/** @var bool enable ajax api */
-	public static $ajaxEnabled = false;
+	public static $ajaxEnabled = FALSE;
 
 	/** @var string URL that calls the Debugger::handleAjaxRequest() method */
 	public static $ajaxRoute = '_tracy/<action>';
@@ -116,8 +116,8 @@ class Debugger
 	/** @var Bar */
 	private static $bar;
 
-	/** @var AjaxHelper */
-	private static $ajaxHelper;
+	/** @var AjaxController */
+	private static $ajaxController;
 
 	/** @var ILogger */
 	private static $logger;
@@ -185,7 +185,7 @@ class Debugger
 			set_exception_handler([__CLASS__, 'exceptionHandler']);
 			set_error_handler([__CLASS__, 'errorHandler']);
 
-			array_map('class_exists', [Bar::class, BlueScreen::class, AjaxHelper::class, DefaultBarPanel::class, Dumper::class,
+			array_map('class_exists', [Bar::class, BlueScreen::class, AjaxController::class, DefaultBarPanel::class, Dumper::class,
 				FireLogger::class, Helpers::class, Logger::class]);
 
 			self::$enabled = TRUE;
@@ -225,9 +225,9 @@ class Debugger
 				self::$reserved = NULL;
 				self::removeOutputBuffers(FALSE);
 				self::getBar()->render();
-			} elseif (self::isAjax()) {
+			} elseif (self::isAjaxMode()) {
 				self::$reserved = NULL;
-				self::getAjaxHelper()->storeBar(self::getBar()->buildInfo());
+				self::getAjaxController()->storeRequestData('bar', self::getBar()->buildInfo());
 			}
 		}
 	}
@@ -278,14 +278,15 @@ class Debugger
 			if (self::$showBar) {
 				self::getBar()->render();
 			}
-		} elseif (!connection_aborted() && self::isAjax()) {
+		} elseif (!connection_aborted() && self::isAjaxMode()) {
 			ob_start();
 			self::getBlueScreen()->render($exception);
 			$bluescreen = ob_get_clean();
-			self::getAjaxHelper()->storeBluescreen($bluescreen);
+			self::getAjaxController()->storeRequestData('bluescreen', $bluescreen);
+			self::getAjaxController()->storeRequestData('bar', self::getBar()->buildInfo());
 
 			header('Content-Type: application/json');
-			echo json_encode(['error' => true]);
+			echo json_encode(['error' => TRUE]);
 		} else {
 			self::fireLog($exception);
 			$s = get_class($exception) . ($exception->getMessage() === '' ? '' : ': ' . $exception->getMessage())
@@ -403,7 +404,7 @@ class Debugger
 			&& !preg_match('#^Content-Type: (?!text/html)#im', implode("\n", headers_list()));
 	}
 
-	private static function isAjax()
+	private static function isAjaxMode()
 	{
 		return isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 	}
@@ -459,14 +460,14 @@ class Debugger
 
 
 	/**
-	 * @return AjaxHelper
+	 * @return AjaxController
 	 */
-	public static function getAjaxHelper()
+	public static function getAjaxController()
 	{
-		if (!self::$ajaxHelper) {
-			self::$ajaxHelper = new AjaxHelper;
+		if (!self::$ajaxController) {
+			self::$ajaxController = new AjaxController;
 		}
-		return self::$ajaxHelper;
+		return self::$ajaxController;
 	}
 
 
