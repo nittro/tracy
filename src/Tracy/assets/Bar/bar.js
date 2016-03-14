@@ -319,7 +319,7 @@
 		this.elem.id = this.id;
 		this.debug.getElement().appendChild(this.elem);
 		this.sections = [new Section(this)];
-		this.getSection(0).addTab(Bar.LOGO, {persistent: true, id: 'tracy-debug-logo', title: 'Tracy Debug'});
+		this.getSection(0).addTab(Bar.LOGO, {persistent: true, raw: true, id: 'tracy-debug-logo', title: 'Tracy Debug'});
 		this.init();
 
 	};
